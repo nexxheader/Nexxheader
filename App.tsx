@@ -104,9 +104,11 @@ interface QuestionnaireProps {
     onSubmit: () => void;
     isLoading: boolean;
     answers: Record<string, string[]>;
+    additionalIdea: string;
+    onAdditionalIdeaChange: (value: string) => void;
 }
 
-const Questionnaire: React.FC<QuestionnaireProps> = ({ questions, onAnswerChange, onSubmit, isLoading, answers }) => (
+const Questionnaire: React.FC<QuestionnaireProps> = ({ questions, onAnswerChange, onSubmit, isLoading, answers, additionalIdea, onAdditionalIdeaChange }) => (
     <div className="w-full max-w-3xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-2 text-slate-100">Refinemos tu idea.</h2>
         <p className="text-center text-slate-300 mb-8">Elige las opciones que mejor se ajusten a tu visión para crear un prompt más preciso.</p>
@@ -130,6 +132,18 @@ const Questionnaire: React.FC<QuestionnaireProps> = ({ questions, onAnswerChange
                 </div>
             ))}
         </div>
+
+        <div className="mt-8 bg-slate-800 p-5 rounded-lg border border-slate-700">
+             <label htmlFor="additional-idea" className="block text-lg font-semibold text-slate-200 mb-3">¿Tienes alguna otra idea para agregar?</label>
+             <textarea
+                id="additional-idea"
+                value={additionalIdea}
+                onChange={(e) => onAdditionalIdeaChange(e.target.value)}
+                placeholder="Ej: que el cielo sea violeta, que el personaje lleve un sombrero..."
+                className="w-full h-24 p-3 bg-slate-700 border border-slate-600 rounded-md text-slate-100 focus:ring-2 focus:ring-blue-500"
+            />
+        </div>
+
         <button
             onClick={onSubmit}
             disabled={isLoading}
@@ -288,6 +302,7 @@ const App: React.FC = () => {
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [answers, setAnswers] = useState<Record<string, string[]>>({});
+    const [additionalIdea, setAdditionalIdea] = useState<string>('');
     const [finalPrompt, setFinalPrompt] = useState<string>('');
     const [generationType, setGenerationType] = useState<GenerationType>('IMAGE');
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
@@ -344,7 +359,7 @@ const App: React.FC = () => {
         setStep('PROMPT');
         
         try {
-            const synthesizedPrompt = await synthesizePrompt(initialIdea, answers, referenceImages);
+            const synthesizedPrompt = await synthesizePrompt(initialIdea, answers, referenceImages, additionalIdea);
             setFinalPrompt(synthesizedPrompt);
         } catch (err) {
             console.error(err);
@@ -433,6 +448,7 @@ const App: React.FC = () => {
         setReferenceImages([]);
         setQuestions([]);
         setAnswers({});
+        setAdditionalIdea('');
         setFinalPrompt('');
         setError(null);
         setResultData(null);
@@ -474,6 +490,8 @@ const App: React.FC = () => {
                     onSubmit={handleAnswersSubmit}
                     isLoading={isLoading}
                     answers={answers}
+                    additionalIdea={additionalIdea}
+                    onAdditionalIdeaChange={setAdditionalIdea}
                 />;
             case 'PROMPT': 
                 return <FinalPrompt 

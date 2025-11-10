@@ -88,21 +88,29 @@ Devuelve las preguntas como un array JSON de objetos, donde cada objeto tiene un
 }
 
 
-export async function synthesizePrompt(idea: string, answers: Record<string, string[]>, referenceImages: string[]): Promise<string> {
+export async function synthesizePrompt(idea: string, answers: Record<string, string[]>, referenceImages: string[], additionalIdea: string): Promise<string> {
     const ai = await getGenAIClient();
     const answersString = Object.entries(answers)
         .filter(([_, value]) => value.length > 0)
         .map(([_, value]) => `- ${value.join(', ')}`)
         .join('\n');
 
-    const textPart: Part = { text: `Eres un ingeniero de prompts de clase mundial para generadores de imágenes y videos con IA. Tu tarea es sintetizar la idea inicial del usuario, sus respuestas seleccionadas y el contenido de las imágenes de referencia (si se proporcionan) en un único prompt profesional, cohesivo y muy detallado.
+    let additionalIdeaText = '';
+    if (additionalIdea.trim()) {
+        additionalIdeaText = `\n\nDetalles Adicionales del Usuario:
+${additionalIdea}`;
+    }
+
+    const promptText = `Eres un ingeniero de prompts de clase mundial para generadores de imágenes y videos con IA. Tu tarea es sintetizar la idea inicial del usuario, sus respuestas seleccionadas, sus detalles adicionales y el contenido de las imágenes de referencia (si se proporcionan) en un único prompt profesional, cohesivo y muy detallado.
 
 Idea Inicial: "${idea}"
 
 Refinamientos del Usuario (opciones seleccionadas):
-${answersString}
+${answersString}${additionalIdeaText}
 
-Si hay imágenes de referencia, describe sus elementos clave, estilo y composición e incorpóralos al prompt. Combina toda esta información en un solo párrafo. El prompt debe ser descriptivo, evocador y proporcionar instrucciones claras para la IA. No hagas más preguntas. Solo proporciona el texto del prompt final.` };
+Si hay imágenes de referencia, describe sus elementos clave, estilo y composición e incorpóralos al prompt. Combina toda esta información en un solo párrafo. El prompt debe ser descriptivo, evocador y proporcionar instrucciones claras para la IA. No hagas más preguntas. Solo proporciona el texto del prompt final.`;
+
+    const textPart: Part = { text: promptText };
 
     const parts: Part[] = [textPart];
 
