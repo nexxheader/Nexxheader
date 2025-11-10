@@ -237,6 +237,16 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
         }
     };
     
+    const handleDownloadImage = () => {
+        if (!resultData) return;
+        const link = document.createElement('a');
+        link.href = resultData;
+        link.download = `nexxprompt-creacion.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="w-full max-w-4xl mx-auto text-center">
              <h2 className="text-3xl font-bold text-slate-100 mb-6">¡Tu Creación está Aquí!</h2>
@@ -284,12 +294,33 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
                 </div>
             )}
 
-            <button
-                onClick={onStartOver}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
-            >
-                Crear Algo Nuevo
-            </button>
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button
+                    onClick={onStartOver}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
+                >
+                    Crear Algo Nuevo
+                </button>
+
+                {generationType === 'IMAGE' && resultData && (
+                    <button
+                        onClick={handleDownloadImage}
+                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
+                    >
+                        Descargar Imagen
+                    </button>
+                )}
+
+                {generationType === 'VIDEO' && resultData && (
+                    <a
+                        href={resultData}
+                        download="nexxprompt-creacion.mp4"
+                        className="w-full sm:w-auto inline-block text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
+                    >
+                        Descargar Video
+                    </a>
+                )}
+            </div>
         </div>
     );
 };
@@ -359,7 +390,7 @@ const App: React.FC = () => {
         setStep('PROMPT');
         
         try {
-            const synthesizedPrompt = await synthesizePrompt(initialIdea, answers, referenceImages, additionalIdea);
+            const synthesizedPrompt = await synthesizePrompt(initialIdea, questions, answers, referenceImages, additionalIdea);
             setFinalPrompt(synthesizedPrompt);
         } catch (err) {
             console.error(err);
