@@ -46,7 +46,7 @@ const IdeaInput: React.FC<IdeaInputProps> = ({ initialIdea, onIdeaChange, onSubm
     return (
         <div className="w-full max-w-2xl mx-auto">
             <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-slate-100">Comienza con una idea simple.</h2>
-            <p className="text-center text-slate-300 mb-8">Convirtamos tu concepto en una obra maestra. ¿Qué quieres crear?</p>
+            <p className="text-center text-slate-300 mb-8 max-w-xl mx-auto">No necesitas ser un experto. Solo danos tu chispa creativa y nuestra IA te guiará con preguntas inteligentes para construir un prompt detallado que dé vida a tu visión.</p>
             
             <textarea
                 value={initialIdea}
@@ -100,25 +100,33 @@ const IdeaInput: React.FC<IdeaInputProps> = ({ initialIdea, onIdeaChange, onSubm
 
 interface QuestionnaireProps {
     questions: Question[];
-    onAnswerChange: (id: string, value: string) => void;
+    onAnswerChange: (id: string, option: string, isChecked: boolean) => void;
     onSubmit: () => void;
     isLoading: boolean;
+    answers: Record<string, string[]>;
 }
 
-const Questionnaire: React.FC<QuestionnaireProps> = ({ questions, onAnswerChange, onSubmit, isLoading }) => (
+const Questionnaire: React.FC<QuestionnaireProps> = ({ questions, onAnswerChange, onSubmit, isLoading, answers }) => (
     <div className="w-full max-w-3xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-2 text-slate-100">Refinemos tu idea.</h2>
-        <p className="text-center text-slate-300 mb-8">Responder estas preguntas ayudará a crear un prompt más detallado y preciso.</p>
+        <p className="text-center text-slate-300 mb-8">Elige las opciones que mejor se ajusten a tu visión para crear un prompt más preciso.</p>
         <div className="space-y-6">
             {questions.map((q) => (
                 <div key={q.id} className="bg-slate-800 p-5 rounded-lg border border-slate-700">
-                    <label className="block text-lg font-semibold text-slate-200 mb-2">{q.question}</label>
-                    <input
-                        type="text"
-                        onChange={(e) => onAnswerChange(q.id, e.target.value)}
-                        placeholder="Tu respuesta aquí..."
-                        className="w-full p-3 bg-slate-700 border border-slate-600 rounded-md text-slate-100 focus:ring-2 focus:ring-blue-500"
-                    />
+                    <label className="block text-lg font-semibold text-slate-200 mb-4">{q.question}</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {q.options.map((option) => (
+                             <label key={option} className={`flex items-center p-3 rounded-md cursor-pointer transition-all duration-200 ${answers[q.id]?.includes(option) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-slate-700 hover:bg-slate-600'}`}>
+                                <input
+                                    type="checkbox"
+                                    onChange={(e) => onAnswerChange(q.id, option, e.target.checked)}
+                                    checked={answers[q.id]?.includes(option) || false}
+                                    className="h-5 w-5 rounded border-slate-500 bg-slate-600 text-blue-600 focus:ring-blue-500 mr-3"
+                                />
+                                <span className="flex-1">{option}</span>
+                            </label>
+                        ))}
+                    </div>
                 </div>
             ))}
         </div>
@@ -279,7 +287,7 @@ const App: React.FC = () => {
     const [initialIdea, setInitialIdea] = useState<string>('');
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [questions, setQuestions] = useState<Question[]>([]);
-    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [answers, setAnswers] = useState<Record<string, string[]>>({});
     const [finalPrompt, setFinalPrompt] = useState<string>('');
     const [generationType, setGenerationType] = useState<GenerationType>('IMAGE');
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
@@ -400,9 +408,23 @@ const App: React.FC = () => {
         }
     };
 
-
-    const handleAnswerChange = (id: string, value: string) => {
-        setAnswers(prev => ({ ...prev, [id]: value }));
+    const handleAnswerChange = (id: string, option: string, isChecked: boolean) => {
+        setAnswers(prev => {
+            const newAnswers = { ...prev };
+            const currentSelection = newAnswers[id] || [];
+            
+            if (isChecked) {
+                // Add the option if it's not already there
+                if (!currentSelection.includes(option)) {
+                    newAnswers[id] = [...currentSelection, option];
+                }
+            } else {
+                // Remove the option
+                newAnswers[id] = currentSelection.filter(item => item !== option);
+            }
+    
+            return newAnswers;
+        });
     };
 
     const handleStartOver = () => {
@@ -451,6 +473,7 @@ const App: React.FC = () => {
                     onAnswerChange={handleAnswerChange}
                     onSubmit={handleAnswersSubmit}
                     isLoading={isLoading}
+                    answers={answers}
                 />;
             case 'PROMPT': 
                 return <FinalPrompt 

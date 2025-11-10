@@ -4,6 +4,7 @@ import { IMAGE_ASPECT_RATIOS, VIDEO_ASPECT_RATIOS } from './constants';
 export interface Question {
   id: string;
   question: string;
+  options: string[];
 }
 
 export type AppStep = 'IDEA' | 'QUESTIONS' | 'PROMPT' | 'GENERATING' | 'RESULT';

@@ -27,7 +27,14 @@ const parseDataUrl = (dataUrl: string): { mimeType: string; data: string } => {
 export async function generateQuestions(idea: string, referenceImages: string[]): Promise<Question[]> {
     const ai = await getGenAIClient();
     
-    const textPart: Part = { text: `Basado en la idea simple del usuario "${idea}" y las imágenes de referencia adjuntas (si las hay), genera entre 5 y 7 preguntas aclaratorias para ayudar a construir un prompt detallado y profesional para un generador de imágenes o videos con IA. Si se proporcionan imágenes, úsalas como contexto principal y haz preguntas sobre cómo modificar o expandir su contenido, estilo o composición. Si no hay imágenes, enfócate solo en la idea de texto. Cubre aspectos como estilo, ambiente, paleta de colores, composición, detalles de personajes y entorno. Devuelve las preguntas como un array JSON de objetos, donde cada objeto tiene un "id" (una cadena de texto única) y una "question" (el texto de la pregunta).` };
+    const textPart: Part = { text: `Basado en la idea simple del usuario "${idea}" y las imágenes de referencia adjuntas (si las hay), genera un máximo de 3 preguntas para construir un prompt detallado para un generador de IA. Para cada pregunta, proporciona también un array de 4 a 6 opciones de respuesta concisas y variadas que el usuario pueda seleccionar.
+
+La estructura de las preguntas debe ser:
+1.  Una pregunta sobre la escena general, la atmósfera, la iluminación y la paleta de colores.
+2.  Una pregunta sobre los detalles del sujeto o personaje principal (apariencia, acciones, emociones).
+3.  Una pregunta sobre el estilo artístico, la composición de la cámara o cualquier otro detalle crucial para mejorar el resultado.
+
+Devuelve las preguntas como un array JSON de objetos, donde cada objeto tiene un "id", una "question" y un array "options" con las sugerencias de respuesta.` };
     
     const parts: Part[] = [textPart];
 
@@ -52,8 +59,12 @@ export async function generateQuestions(idea: string, referenceImages: string[])
                     properties: {
                         id: { type: Type.STRING },
                         question: { type: Type.STRING },
+                        options: {
+                            type: Type.ARRAY,
+                            items: { type: Type.STRING }
+                        }
                     },
-                    required: ["id", "question"],
+                    required: ["id", "question", "options"],
                 },
             },
             thinkingConfig: { thinkingBudget: 32768 },
@@ -64,7 +75,7 @@ export async function generateQuestions(idea: string, referenceImages: string[])
         const jsonText = response.text.trim();
         const questionsArray = JSON.parse(jsonText);
         // Basic validation
-        if (Array.isArray(questionsArray) && questionsArray.every(q => q.id && q.question)) {
+        if (Array.isArray(questionsArray) && questionsArray.every(q => q.id && q.question && Array.isArray(q.options))) {
             return questionsArray;
         } else {
             throw new Error("Estructura JSON inválida para las preguntas.");
@@ -77,17 +88,18 @@ export async function generateQuestions(idea: string, referenceImages: string[])
 }
 
 
-export async function synthesizePrompt(idea: string, answers: Record<string, string>, referenceImages: string[]): Promise<string> {
+export async function synthesizePrompt(idea: string, answers: Record<string, string[]>, referenceImages: string[]): Promise<string> {
     const ai = await getGenAIClient();
     const answersString = Object.entries(answers)
-        .map(([_, value]) => `- ${value}`)
+        .filter(([_, value]) => value.length > 0)
+        .map(([_, value]) => `- ${value.join(', ')}`)
         .join('\n');
 
-    const textPart: Part = { text: `Eres un ingeniero de prompts de clase mundial para generadores de imágenes y videos con IA. Tu tarea es sintetizar la idea inicial del usuario, sus respuestas a las preguntas aclaratorias y el contenido de las imágenes de referencia (si se proporcionan) en un único prompt profesional, cohesivo y muy detallado.
+    const textPart: Part = { text: `Eres un ingeniero de prompts de clase mundial para generadores de imágenes y videos con IA. Tu tarea es sintetizar la idea inicial del usuario, sus respuestas seleccionadas y el contenido de las imágenes de referencia (si se proporcionan) en un único prompt profesional, cohesivo y muy detallado.
 
 Idea Inicial: "${idea}"
 
-Refinamientos del Usuario (respuestas a preguntas):
+Refinamientos del Usuario (opciones seleccionadas):
 ${answersString}
 
 Si hay imágenes de referencia, describe sus elementos clave, estilo y composición e incorpóralos al prompt. Combina toda esta información en un solo párrafo. El prompt debe ser descriptivo, evocador y proporcionar instrucciones claras para la IA. No hagas más preguntas. Solo proporciona el texto del prompt final.` };
