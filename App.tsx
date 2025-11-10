@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ApiKeySelector } from './components/ApiKeySelector';
-import { generateQuestions, synthesizePrompt, generateImage, generateVideo, editImage } from './services/geminiService';
+import { generateQuestions, synthesizePrompt, generateImage, generateVideo } from './services/geminiService';
 import type { Question, AppStep, GenerationType, AspectRatio } from './types';
 import { IMAGE_ASPECT_RATIOS, VIDEO_ASPECT_RATIOS } from './constants';
 
@@ -220,23 +220,9 @@ interface GenerationResultProps {
     resultData: string | null;
     generationType: GenerationType;
     onStartOver: () => void;
-    finalPrompt: string;
-    onRefine: (refinementIdea: string, keepFaces: boolean) => void;
-    isRefining: boolean;
-    refiningMessage: string;
 }
 
-const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generationType, onStartOver, finalPrompt, onRefine, isRefining, refiningMessage }) => {
-    const [refinementIdea, setRefinementIdea] = useState('');
-    const [keepFacesConsistent, setKeepFacesConsistent] = useState(true);
-
-    const handleRefineClick = () => {
-        if (refinementIdea.trim()) {
-            onRefine(refinementIdea, keepFacesConsistent);
-            setRefinementIdea('');
-        }
-    };
-    
+const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generationType, onStartOver }) => {
     const handleDownloadImage = () => {
         if (!resultData) return;
         const link = document.createElement('a');
@@ -251,7 +237,6 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
         <div className="w-full max-w-4xl mx-auto text-center">
              <h2 className="text-3xl font-bold text-slate-100 mb-6">¡Tu Creación está Aquí!</h2>
              <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 mb-8 flex justify-center items-center relative">
-                {isRefining && <div className="absolute inset-0 bg-slate-900/80 flex flex-col justify-center items-center z-10 rounded-lg"><LoadingSpinner /><p className="mt-2 text-slate-200">{refiningMessage}</p></div>}
                 {resultData && generationType === 'IMAGE' && (
                     <img src={resultData} alt="Contenido generado" className="max-w-full max-h-[70vh] rounded-md" />
                 )}
@@ -260,40 +245,6 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
                 )}
             </div>
             
-            {generationType === 'IMAGE' && (
-                <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 mb-8 text-left">
-                    <h3 className="text-2xl font-bold text-slate-100 mb-4">¿Quieres mejorar algo?</h3>
-                    <p className="text-slate-300 mb-4">Describe qué te gustaría cambiar o agregar para generar una nueva versión.</p>
-                    <textarea
-                        value={refinementIdea}
-                        onChange={(e) => setRefinementIdea(e.target.value)}
-                        placeholder="Ej: ahora con un estilo de acuarela, añade una luna en el cielo, cambia el color del objeto principal a rojo..."
-                        className="w-full h-24 p-3 bg-slate-700 border border-slate-600 rounded-md text-slate-100 focus:ring-2 focus:ring-blue-500"
-                        disabled={isRefining}
-                    />
-                     <div className="flex items-center mt-4">
-                        <input
-                            id="keep-faces"
-                            type="checkbox"
-                            checked={keepFacesConsistent}
-                            onChange={(e) => setKeepFacesConsistent(e.target.checked)}
-                            className="h-5 w-5 rounded border-slate-500 bg-slate-700 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-                            disabled={isRefining}
-                        />
-                        <label htmlFor="keep-faces" className="ml-3 text-slate-300">
-                            Mantener rostros consistentes
-                        </label>
-                    </div>
-                    <button
-                        onClick={handleRefineClick}
-                        disabled={isRefining || !refinementIdea.trim()}
-                        className="mt-4 w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-500 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105"
-                    >
-                        {isRefining ? <LoadingSpinner /> : 'Generar Variante'}
-                    </button>
-                </div>
-            )}
-
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <button
                     onClick={onStartOver}
@@ -338,9 +289,7 @@ const App: React.FC = () => {
     const [generationType, setGenerationType] = useState<GenerationType>('IMAGE');
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [isRefining, setIsRefining] = useState<boolean>(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('');
-    const [refiningMessage, setRefiningMessage] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [resultData, setResultData] = useState<string | null>(null);
     const [isApiKeySelected, setIsApiKeySelected] = useState(false);
@@ -433,29 +382,6 @@ const App: React.FC = () => {
         }
     };
 
-    const handleRefineSubmit = async (refinementIdea: string, keepFaces: boolean) => {
-        if (!resultData) {
-            setError("No hay imagen base para refinar.");
-            return;
-        }
-        setIsRefining(true);
-        setRefiningMessage('Analizando la imagen y preparando la edición...');
-        setError(null);
-        try {
-            // New logic: Directly edit the existing image for better consistency.
-            const newImageUrl = await editImage(resultData, refinementIdea, keepFaces, (message) => setRefiningMessage(message));
-            setResultData(newImageUrl);
-
-        } catch (err: any) {
-            console.error(err);
-            const errorMessage = err.message || 'Ocurrió un error inesperado durante el refinamiento.';
-            setError(`El refinamiento de la imagen falló. ${errorMessage}`);
-            // Don't change step, stay on result page
-        } finally {
-            setIsRefining(false);
-        }
-    };
-
     const handleAnswerChange = (id: string, option: string, isChecked: boolean) => {
         setAnswers(prev => {
             const newAnswers = { ...prev };
@@ -543,10 +469,6 @@ const App: React.FC = () => {
                     resultData={resultData}
                     generationType={generationType}
                     onStartOver={handleStartOver}
-                    finalPrompt={finalPrompt}
-                    onRefine={handleRefineSubmit}
-                    isRefining={isRefining}
-                    refiningMessage={refiningMessage}
                 />;
             default: 
                 return <IdeaInput 
