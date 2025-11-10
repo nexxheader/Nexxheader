@@ -140,47 +140,78 @@ Si hay imágenes de referencia, describe sus elementos clave, estilo y composici
     return response.text.trim();
 }
 
-export async function editImage(originalImageBase64: string, refinementIdea: string, keepFaces: boolean): Promise<string> {
-    const ai = await getGenAIClient();
-    
-    let textPrompt = refinementIdea;
+async function generateEditMask(ai: GoogleGenAI, originalImageBase64: string, refinementIdea: string, keepFaces: boolean): Promise<string> {
+    const { mimeType, data } = parseDataUrl(originalImageBase64);
+    const imagePart: Part = { inlineData: { mimeType, data } };
+
+    let prompt = `Tu tarea es crear una máscara de segmentación para una tarea de edición de imágenes. El usuario quiere realizar el siguiente cambio: "${refinementIdea}".
+Analiza la imagen proporcionada y genera una máscara en blanco y negro. Las áreas a modificar deben ser de color blanco puro (#FFFFFF). Las áreas a preservar deben ser de color negro puro (#000000).`;
+
     if (keepFaces) {
-        textPrompt += "\n\nInstrucción Adicional: No alteres, cambies o regeneres los rostros de ninguna persona presente en la imagen. Mantén sus características faciales idénticas.";
+        prompt += `\n\nCRÍTICO: Asegúrate de que las áreas faciales de cualquier persona en la imagen sean completamente negras para protegerlas de cualquier cambio. La identidad y los rasgos faciales deben permanecer idénticos.`;
     }
 
-    const { mimeType, data } = parseDataUrl(originalImageBase64);
+    prompt += `\n\nResponde únicamente con la imagen de la máscara. No incluyas ningún texto, explicación o formato adicional.`;
 
-    const imagePart: Part = {
-        inlineData: {
-            mimeType: mimeType,
-            data: data,
-        },
-    };
-
-    const textPart: Part = {
-        text: textPrompt,
-    };
+    const textPart: Part = { text: prompt };
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-            parts: [imagePart, textPart],
-        },
+        model: 'gemini-2.5-pro',
+        contents: { parts: [imagePart, textPart] },
         config: {
-            responseModalities: [Modality.IMAGE],
+             responseModalities: [Modality.IMAGE],
+             thinkingConfig: { thinkingBudget: 32768 },
         },
     });
 
-    // Extract the image from the response
     for (const part of response.candidates[0].content.parts) {
         if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
-            const base64ImageBytes: string = part.inlineData.data;
-            return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         }
+    }
+    throw new Error("No se pudo generar la máscara de edición.");
+}
+
+
+export async function editImage(originalImageBase64: string, refinementIdea: string, keepFaces: boolean, updateLoadingMessage: (message: string) => void): Promise<string> {
+    const ai = await getGenAIClient();
+    
+    // Step 1: Generate the segmentation mask
+    const maskBase64 = await generateEditMask(ai, originalImageBase64, refinementIdea, keepFaces);
+    updateLoadingMessage('Máscara creada. Aplicando edición a la imagen...');
+
+    // Step 2: Use the mask to perform inpainting with Imagen
+    const { mimeType: originalMimeType, data: originalImageData } = parseDataUrl(originalImageBase64);
+    const { mimeType: maskMimeType, data: maskImageData } = parseDataUrl(maskBase64);
+
+    const response = await ai.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: refinementIdea,
+        image: {
+            imageBytes: originalImageData,
+            mimeType: originalMimeType,
+        },
+        editConfig: {
+            mask: {
+                imageBytes: maskImageData,
+                mimeType: maskMimeType,
+            },
+            editMode: 'INPAINTING'
+        },
+        config: {
+             numberOfImages: 1,
+             outputMimeType: 'image/png',
+        }
+    });
+
+    if (response.generatedImages && response.generatedImages.length > 0) {
+        const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+        return `data:image/png;base64,${base64ImageBytes}`;
     }
 
     throw new Error("La edición de la imagen no pudo producir un resultado.");
 }
+
 
 
 export async function generateImage(prompt: string, aspectRatio: string): Promise<string> {
