@@ -26,17 +26,20 @@ interface IdeaInputProps {
     onIdeaChange: (value: string) => void;
     onSubmit: () => void;
     isLoading: boolean;
-    referenceImage: string | null;
-    onImageUpload: (base64: string) => void;
-    onImageRemove: () => void;
+    referenceImages: string[];
+    onImagesUpload: (base64s: string[]) => void;
+    onImageRemove: (index: number) => void;
 }
 
-const IdeaInput: React.FC<IdeaInputProps> = ({ initialIdea, onIdeaChange, onSubmit, isLoading, referenceImage, onImageUpload, onImageRemove }) => {
+const IdeaInput: React.FC<IdeaInputProps> = ({ initialIdea, onIdeaChange, onSubmit, isLoading, referenceImages, onImagesUpload, onImageRemove }) => {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const base64 = await fileToBase64(file);
-            onImageUpload(base64);
+        const files = event.target.files;
+        if (files) {
+            // FIX: Use spread syntax to convert FileList to an array. This addresses a type inference issue where Array.from() was resulting in 'unknown' type for array elements.
+            const base64Promises = [...files].map(file => fileToBase64(file));
+            const base64s = await Promise.all(base64Promises);
+            onImagesUpload(base64s);
+            event.target.value = ''; // Reset file input
         }
     };
 
@@ -45,38 +48,45 @@ const IdeaInput: React.FC<IdeaInputProps> = ({ initialIdea, onIdeaChange, onSubm
             <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-slate-100">Comienza con una idea simple.</h2>
             <p className="text-center text-slate-300 mb-8">Convirtamos tu concepto en una obra maestra. ¿Qué quieres crear?</p>
             
-            <div className="mb-6 bg-slate-800 p-4 rounded-lg border border-slate-700">
-                <label htmlFor="image-upload" className="block text-lg font-semibold text-slate-200 mb-2">Sube una imagen de referencia (Opcional)</label>
-                {referenceImage ? (
-                    <div className="relative group">
-                        <img src={referenceImage} alt="Referencia" className="w-40 h-40 object-cover rounded-md mx-auto" />
-                        <button 
-                            onClick={onImageRemove}
-                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-bold text-xl"
-                            aria-label="Eliminar imagen"
-                        >
-                            &times;
-                        </button>
-                    </div>
-                ) : (
-                    <div className="flex items-center justify-center w-full">
-                        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-600 border-dashed rounded-lg cursor-pointer bg-slate-800 hover:bg-slate-700 transition-colors">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <p className="mb-2 text-sm text-slate-400"><span className="font-semibold">Haz clic para subir</span> o arrastra y suelta</p>
-                                <p className="text-xs text-slate-500">PNG, JPG, WEBP</p>
-                            </div>
-                            <input id="dropzone-file" type="file" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handleFileChange} />
-                        </label>
-                    </div> 
-                )}
-            </div>
-
             <textarea
                 value={initialIdea}
                 onChange={(e) => onIdeaChange(e.target.value)}
                 placeholder="Ej: un perro verde, una ciudad futurista, un robot solitario en Marte..."
-                className="w-full h-32 p-4 bg-slate-800 border-2 border-slate-600 rounded-lg text-lg text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full h-40 p-4 bg-slate-800 border-2 border-slate-600 rounded-lg text-lg text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors mb-6"
             />
+
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                <label className="block text-lg font-semibold text-slate-200 mb-2">Sube imágenes de referencia (Opcional)</label>
+                
+                {referenceImages.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 mb-4">
+                        {referenceImages.map((image, index) => (
+                            <div key={index} className="relative group aspect-square">
+                                <img src={image} alt={`Referencia ${index + 1}`} className="w-full h-full object-cover rounded-md" />
+                                <button 
+                                    onClick={() => onImageRemove(index)}
+                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full h-6 w-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-bold text-lg"
+                                    aria-label={`Eliminar imagen ${index + 1}`}
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
+                <div className="flex items-center justify-center w-full">
+                    <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-600 border-dashed rounded-lg cursor-pointer bg-slate-800 hover:bg-slate-700 transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <p className="mb-2 text-sm text-slate-400"><span className="font-semibold">Haz clic para subir</span> o arrastra y suelta</p>
+                            <p className="text-xs text-slate-500">PNG, JPG, WEBP (múltiples archivos)</p>
+                        </div>
+                        <input id="dropzone-file" type="file" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handleFileChange} multiple />
+                    </label>
+                </div> 
+            </div>
+
+
             <button
                 onClick={onSubmit}
                 disabled={isLoading}
@@ -190,16 +200,17 @@ interface GenerationResultProps {
     generationType: GenerationType;
     onStartOver: () => void;
     finalPrompt: string;
-    onRefine: (refinementIdea: string) => void;
+    onRefine: (refinementIdea: string, keepFaces: boolean) => void;
     isRefining: boolean;
 }
 
 const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generationType, onStartOver, finalPrompt, onRefine, isRefining }) => {
     const [refinementIdea, setRefinementIdea] = useState('');
+    const [keepFacesConsistent, setKeepFacesConsistent] = useState(true);
 
     const handleRefineClick = () => {
         if (refinementIdea.trim()) {
-            onRefine(refinementIdea);
+            onRefine(refinementIdea, keepFacesConsistent);
             setRefinementIdea('');
         }
     };
@@ -228,6 +239,19 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
                         className="w-full h-24 p-3 bg-slate-700 border border-slate-600 rounded-md text-slate-100 focus:ring-2 focus:ring-blue-500"
                         disabled={isRefining}
                     />
+                     <div className="flex items-center mt-4">
+                        <input
+                            id="keep-faces"
+                            type="checkbox"
+                            checked={keepFacesConsistent}
+                            onChange={(e) => setKeepFacesConsistent(e.target.checked)}
+                            className="h-5 w-5 rounded border-slate-500 bg-slate-700 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                            disabled={isRefining}
+                        />
+                        <label htmlFor="keep-faces" className="ml-3 text-slate-300">
+                            Mantener rostros consistentes
+                        </label>
+                    </div>
                     <button
                         onClick={handleRefineClick}
                         disabled={isRefining || !refinementIdea.trim()}
@@ -253,7 +277,7 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
 const App: React.FC = () => {
     const [step, setStep] = useState<AppStep>('IDEA');
     const [initialIdea, setInitialIdea] = useState<string>('');
-    const [referenceImage, setReferenceImage] = useState<string | null>(null);
+    const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [finalPrompt, setFinalPrompt] = useState<string>('');
@@ -284,7 +308,7 @@ const App: React.FC = () => {
     }, [generationType]);
 
     const handleIdeaSubmit = async () => {
-        if (!initialIdea.trim() && !referenceImage) {
+        if (!initialIdea.trim() && referenceImages.length === 0) {
             setError('Por favor, ingresa una idea o sube una imagen para comenzar.');
             return;
         }
@@ -294,7 +318,7 @@ const App: React.FC = () => {
         setStep('QUESTIONS');
 
         try {
-            const generatedQuestions = await generateQuestions(initialIdea, referenceImage);
+            const generatedQuestions = await generateQuestions(initialIdea, referenceImages);
             setQuestions(generatedQuestions);
         } catch (err) {
             console.error(err);
@@ -312,7 +336,7 @@ const App: React.FC = () => {
         setStep('PROMPT');
         
         try {
-            const synthesizedPrompt = await synthesizePrompt(initialIdea, answers, referenceImage);
+            const synthesizedPrompt = await synthesizePrompt(initialIdea, answers, referenceImages);
             setFinalPrompt(synthesizedPrompt);
         } catch (err) {
             console.error(err);
@@ -354,12 +378,12 @@ const App: React.FC = () => {
         }
     };
 
-    const handleRefineSubmit = async (refinementIdea: string) => {
+    const handleRefineSubmit = async (refinementIdea: string, keepFaces: boolean) => {
         setIsRefining(true);
         setError(null);
         try {
             // 1. Refine the prompt
-            const newPrompt = await refinePrompt(finalPrompt, refinementIdea);
+            const newPrompt = await refinePrompt(finalPrompt, refinementIdea, keepFaces);
             setFinalPrompt(newPrompt); // Update the prompt for future refinements
 
             // 2. Generate new image with the new prompt
@@ -384,7 +408,7 @@ const App: React.FC = () => {
     const handleStartOver = () => {
         setStep('IDEA');
         setInitialIdea('');
-        setReferenceImage(null);
+        setReferenceImages([]);
         setQuestions([]);
         setAnswers({});
         setFinalPrompt('');
@@ -394,6 +418,14 @@ const App: React.FC = () => {
         setAspectRatio('1:1');
     };
     
+    const handleImagesUpload = (base64s: string[]) => {
+        setReferenceImages(prev => [...prev, ...base64s]);
+    };
+    
+    const handleImageRemove = (indexToRemove: number) => {
+        setReferenceImages(prev => prev.filter((_, index) => index !== indexToRemove));
+    };
+
     const renderStep = () => {
         if (isLoading && step !== 'IDEA' && step !== 'RESULT') {
              return <div className="text-center text-slate-200">
@@ -409,9 +441,9 @@ const App: React.FC = () => {
                     onIdeaChange={setInitialIdea} 
                     onSubmit={handleIdeaSubmit} 
                     isLoading={isLoading} 
-                    referenceImage={referenceImage}
-                    onImageUpload={setReferenceImage}
-                    onImageRemove={() => setReferenceImage(null)}
+                    referenceImages={referenceImages}
+                    onImagesUpload={handleImagesUpload}
+                    onImageRemove={handleImageRemove}
                 />;
             case 'QUESTIONS': 
                 return <Questionnaire 
@@ -447,9 +479,9 @@ const App: React.FC = () => {
                     onIdeaChange={setInitialIdea} 
                     onSubmit={handleIdeaSubmit} 
                     isLoading={isLoading}
-                    referenceImage={referenceImage}
-                    onImageUpload={setReferenceImage}
-                    onImageRemove={() => setReferenceImage(null)}
+                    referenceImages={referenceImages}
+                    onImagesUpload={handleImagesUpload}
+                    onImageRemove={handleImageRemove}
                 />;
         }
     };
