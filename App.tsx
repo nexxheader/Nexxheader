@@ -3,7 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ApiKeySelector } from './components/ApiKeySelector';
-import { generateQuestions, synthesizePrompt, generateImage, generateVideo, refinePrompt } from './services/geminiService';
+import { generateQuestions, synthesizePrompt, generateImage, generateVideo, editImage } from './services/geminiService';
 import type { Question, AppStep, GenerationType, AspectRatio } from './types';
 import { IMAGE_ASPECT_RATIOS, VIDEO_ASPECT_RATIOS } from './constants';
 
@@ -433,16 +433,16 @@ const App: React.FC = () => {
     };
 
     const handleRefineSubmit = async (refinementIdea: string, keepFaces: boolean) => {
+        if (!resultData) {
+            setError("No hay imagen base para refinar.");
+            return;
+        }
         setIsRefining(true);
         setError(null);
         try {
-            // 1. Refine the prompt
-            const newPrompt = await refinePrompt(finalPrompt, refinementIdea, keepFaces);
-            setFinalPrompt(newPrompt); // Update the prompt for future refinements
-
-            // 2. Generate new image with the new prompt
-            const imageUrl = await generateImage(newPrompt, aspectRatio);
-            setResultData(imageUrl);
+            // New logic: Directly edit the existing image for better consistency.
+            const newImageUrl = await editImage(resultData, refinementIdea, keepFaces);
+            setResultData(newImageUrl);
 
         } catch (err: any) {
             console.error(err);

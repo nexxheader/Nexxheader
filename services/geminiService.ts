@@ -1,6 +1,6 @@
 
 // FIX: Removed import of deprecated 'GenerateContentRequest' as it is no longer exported from "@google/genai".
-import { GoogleGenAI, Type, Part } from "@google/genai";
+import { GoogleGenAI, Type, Part, Modality } from "@google/genai";
 import type { Question, AspectRatio } from '../types';
 
 async function getGenAIClient() {
@@ -140,28 +140,46 @@ Si hay imágenes de referencia, describe sus elementos clave, estilo y composici
     return response.text.trim();
 }
 
-export async function refinePrompt(originalPrompt: string, refinementIdea: string, keepFaces: boolean): Promise<string> {
+export async function editImage(originalImageBase64: string, refinementIdea: string, keepFaces: boolean): Promise<string> {
     const ai = await getGenAIClient();
-
-    let finalRefinementIdea = refinementIdea;
+    
+    let textPrompt = refinementIdea;
     if (keepFaces) {
-        finalRefinementIdea += "\n\n**Instrucción Adicional Importante:** No alteres, cambies o regeneres los rostros de ninguna persona presente en la imagen. Mantén sus características faciales idénticas a como se describen en el prompt original.";
+        textPrompt += "\n\nInstrucción Adicional: No alteres, cambies o regeneres los rostros de ninguna persona presente en la imagen. Mantén sus características faciales idénticas.";
     }
 
+    const { mimeType, data } = parseDataUrl(originalImageBase64);
+
+    const imagePart: Part = {
+        inlineData: {
+            mimeType: mimeType,
+            data: data,
+        },
+    };
+
+    const textPart: Part = {
+        text: textPrompt,
+    };
+
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
-        contents: `Eres un ingeniero de prompts de clase mundial. Tu tarea es refinar un prompt existente basado en una nueva indicación del usuario.
-
-Prompt Original: "${originalPrompt}"
-
-Indicación de Refinamiento del Usuario: "${finalRefinementIdea}"
-
-Integra la indicación de refinamiento en el prompt original para crear una nueva versión mejorada. El nuevo prompt debe mantener la esencia del original pero incorporar el cambio solicitado de manera fluida y detallada. No hagas preguntas. Solo proporciona el texto del nuevo prompt final en un único párrafo.`,
+        model: 'gemini-2.5-flash-image',
+        contents: {
+            parts: [imagePart, textPart],
+        },
         config: {
-            thinkingConfig: { thinkingBudget: 32768 },
+            responseModalities: [Modality.IMAGE],
         },
     });
-    return response.text.trim();
+
+    // Extract the image from the response
+    for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
+            const base64ImageBytes: string = part.inlineData.data;
+            return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+        }
+    }
+
+    throw new Error("La edición de la imagen no pudo producir un resultado.");
 }
 
 
