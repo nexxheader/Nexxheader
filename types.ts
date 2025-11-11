@@ -1,5 +1,5 @@
 
-import { IMAGE_ASPECT_RATIOS, VIDEO_ASPECT_RATIOS } from './constants';
+import { IMAGE_ASPECT_RATIOS } from './constants';
 
 export interface Question {
   id: string;
@@ -9,6 +9,4 @@ export interface Question {
 
 export type AppStep = 'IDEA' | 'QUESTIONS' | 'PROMPT' | 'GENERATING' | 'RESULT';
 
-export type GenerationType = 'IMAGE' | 'VIDEO';
-
-export type AspectRatio = typeof IMAGE_ASPECT_RATIOS[number] | typeof VIDEO_ASPECT_RATIOS[number];
+export type AspectRatio = typeof IMAGE_ASPECT_RATIOS[number];

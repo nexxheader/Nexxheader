@@ -3,13 +3,11 @@ import { GoogleGenAI, Type, Part } from "@google/genai";
 import type { Question, AspectRatio } from '../types';
 
 async function getGenAIClient() {
-    // This function ensures a fresh client is created for each call,
-    // especially important for Veo to pick up the latest API key.
+    // This function creates a new GenAI client instance.
     if (!process.env.API_KEY) {
-        // In a real app, you might want to throw an error or handle this case more gracefully.
-        // For Veo, the key is selected via a dialog, so this check is a fallback.
+        // The API key is expected to be set in the environment.
+        // A user-facing error will be thrown from the calling function if an API call fails due to a missing key.
         console.error("API_KEY environment variable not set.");
-        // A user-facing error will be thrown from the calling function if the API call fails.
     }
     return new GoogleGenAI({ apiKey: process.env.API_KEY });
 }
@@ -156,37 +154,4 @@ export async function generateImage(prompt: string, aspectRatio: string): Promis
         return `data:image/png;base64,${base64ImageBytes}`;
     }
     throw new Error("La generación de imagen no pudo producir una imagen.");
-}
-
-export async function generateVideo(prompt: string, aspectRatio: string): Promise<string> {
-    const ai = await getGenAIClient();
-    let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
-        prompt: prompt,
-        config: {
-            numberOfVideos: 1,
-            resolution: '720p',
-            aspectRatio: aspectRatio as '16:9' | '9:16',
-        },
-    });
-
-    // Poll for completion
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // wait 10 seconds
-        operation = await ai.operations.getVideosOperation({ operation: operation });
-    }
-
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) {
-        throw new Error("La generación de video se completó, pero no se encontró un enlace de descarga.");
-    }
-
-    // The download link needs the API key appended to it
-    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-    if (!videoResponse.ok) {
-        throw new Error(`Error al descargar el video generado. Estado: ${videoResponse.statusText}`);
-    }
-
-    const videoBlob = await videoResponse.blob();
-    return URL.createObjectURL(videoBlob);
 }

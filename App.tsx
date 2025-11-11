@@ -1,10 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { LoadingSpinner } from './components/LoadingSpinner';
-import { ApiKeySelector } from './components/ApiKeySelector';
-import { generateQuestions, synthesizePrompt, generateImage, generateVideo } from './services/geminiService';
-import type { Question, AppStep, GenerationType, AspectRatio } from './types';
-import { IMAGE_ASPECT_RATIOS, VIDEO_ASPECT_RATIOS } from './constants';
+import { generateQuestions, synthesizePrompt, generateImage } from './services/geminiService';
+import type { Question, AppStep, AspectRatio } from './types';
+import { IMAGE_ASPECT_RATIOS } from './constants';
 
 // --- Helper Functions ---
 
@@ -155,62 +154,38 @@ const Questionnaire: React.FC<QuestionnaireProps> = ({ questions, onAnswerChange
 
 interface FinalPromptProps {
     finalPrompt: string;
-    generationType: GenerationType;
-    onGenerationTypeChange: (type: GenerationType) => void;
     aspectRatio: AspectRatio;
     onAspectRatioChange: (ratio: AspectRatio) => void;
     onGenerate: () => void;
     isLoading: boolean;
-    isApiKeySelected: boolean;
-    onKeySelected: () => void;
 }
 
-const FinalPrompt: React.FC<FinalPromptProps> = ({ finalPrompt, generationType, onGenerationTypeChange, aspectRatio, onAspectRatioChange, onGenerate, isLoading, isApiKeySelected, onKeySelected }) => (
+const FinalPrompt: React.FC<FinalPromptProps> = ({ finalPrompt, aspectRatio, onAspectRatioChange, onGenerate, isLoading }) => (
     <div className="w-full max-w-4xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-slate-100">¡Tu Prompt Profesional está listo!</h2>
         <div className="bg-slate-800 p-6 rounded-lg border-2 border-blue-500 mb-8 prose prose-invert max-w-none text-lg">
             <p>{finalPrompt}</p>
         </div>
         <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                <div>
-                    <label className="block text-lg font-semibold text-slate-200 mb-3">1. Elige el Tipo de Contenido</label>
-                    <div className="flex space-x-4">
-                        <button
-                            onClick={() => onGenerationTypeChange('IMAGE')}
-                            className={`flex-1 py-3 px-4 rounded-lg font-bold text-lg transition-colors ${generationType === 'IMAGE' ? 'bg-blue-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}
-                        >
-                            Imagen
-                        </button>
-                        <button
-                            onClick={() => onGenerationTypeChange('VIDEO')}
-                            className={`flex-1 py-3 px-4 rounded-lg font-bold text-lg transition-colors ${generationType === 'VIDEO' ? 'bg-blue-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}
-                        >
-                            Video
-                        </button>
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-lg font-semibold text-slate-200 mb-3">2. Selecciona la Proporción</label>
-                    <select
-                        value={aspectRatio}
-                        onChange={(e) => onAspectRatioChange(e.target.value as AspectRatio)}
-                        className="w-full p-3 bg-slate-700 border border-slate-600 rounded-md text-slate-100 focus:ring-2 focus:ring-blue-500"
-                    >
-                        {(generationType === 'IMAGE' ? IMAGE_ASPECT_RATIOS : VIDEO_ASPECT_RATIOS).map(ratio => (
-                            <option key={ratio} value={ratio}>{ratio}</option>
-                        ))}
-                    </select>
-                </div>
+            <div className="max-w-md mx-auto">
+                <label className="block text-lg font-semibold text-slate-200 mb-3">Selecciona la Proporción de la Imagen</label>
+                <select
+                    value={aspectRatio}
+                    onChange={(e) => onAspectRatioChange(e.target.value as AspectRatio)}
+                    className="w-full p-3 bg-slate-700 border border-slate-600 rounded-md text-slate-100 focus:ring-2 focus:ring-blue-500"
+                >
+                    {IMAGE_ASPECT_RATIOS.map(ratio => (
+                        <option key={ratio} value={ratio}>{ratio}</option>
+                    ))}
+                </select>
             </div>
-             {generationType === 'VIDEO' && <ApiKeySelector onKeySelected={onKeySelected} isKeySelected={isApiKeySelected} />}
-
+            
             <button
                 onClick={onGenerate}
-                disabled={isLoading || (generationType === 'VIDEO' && !isApiKeySelected)}
+                disabled={isLoading}
                 className="mt-8 w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-500 text-white font-bold py-3 px-6 rounded-lg text-xl transition-transform transform hover:scale-105"
             >
-               {isLoading ? <LoadingSpinner /> : `Generar ${generationType === 'IMAGE' ? 'Imagen' : 'Video'}`}
+               {isLoading ? <LoadingSpinner /> : `Generar Imagen`}
             </button>
         </div>
     </div>
@@ -218,11 +193,10 @@ const FinalPrompt: React.FC<FinalPromptProps> = ({ finalPrompt, generationType, 
 
 interface GenerationResultProps {
     resultData: string | null;
-    generationType: GenerationType;
     onStartOver: () => void;
 }
 
-const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generationType, onStartOver }) => {
+const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, onStartOver }) => {
     const handleDownloadImage = () => {
         if (!resultData) return;
         const link = document.createElement('a');
@@ -237,11 +211,8 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
         <div className="w-full max-w-4xl mx-auto text-center">
              <h2 className="text-3xl font-bold text-slate-100 mb-6">¡Tu Creación está Aquí!</h2>
              <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 mb-8 flex justify-center items-center relative">
-                {resultData && generationType === 'IMAGE' && (
+                {resultData && (
                     <img src={resultData} alt="Contenido generado" className="max-w-full max-h-[70vh] rounded-md" />
-                )}
-                {resultData && generationType === 'VIDEO' && (
-                    <video controls src={resultData} className="max-w-full max-h-[70vh] rounded-md" />
                 )}
             </div>
             
@@ -253,23 +224,13 @@ const GenerationResult: React.FC<GenerationResultProps> = ({ resultData, generat
                     Crear Algo Nuevo
                 </button>
 
-                {generationType === 'IMAGE' && resultData && (
+                {resultData && (
                     <button
                         onClick={handleDownloadImage}
                         className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
                     >
                         Descargar Imagen
                     </button>
-                )}
-
-                {generationType === 'VIDEO' && resultData && (
-                    <a
-                        href={resultData}
-                        download="nexxprompt-creacion.mp4"
-                        className="w-full sm:w-auto inline-block text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
-                    >
-                        Descargar Video
-                    </a>
                 )}
             </div>
         </div>
@@ -286,13 +247,11 @@ const App: React.FC = () => {
     const [answers, setAnswers] = useState<Record<string, string[]>>({});
     const [additionalIdea, setAdditionalIdea] = useState<string>('');
     const [finalPrompt, setFinalPrompt] = useState<string>('');
-    const [generationType, setGenerationType] = useState<GenerationType>('IMAGE');
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [resultData, setResultData] = useState<string | null>(null);
-    const [isApiKeySelected, setIsApiKeySelected] = useState(false);
     const [isEmbedded, setIsEmbedded] = useState(false);
 
     useEffect(() => {
@@ -302,14 +261,6 @@ const App: React.FC = () => {
         }
     }, []);
 
-
-    useEffect(() => {
-        if (generationType === 'IMAGE') {
-            setAspectRatio('1:1');
-        } else {
-            setAspectRatio('16:9');
-        }
-    }, [generationType]);
 
     const handleIdeaSubmit = async () => {
         if (!initialIdea.trim() && referenceImages.length === 0) {
@@ -358,24 +309,14 @@ const App: React.FC = () => {
         setResultData(null);
 
         try {
-            if (generationType === 'IMAGE') {
-                setLoadingMessage('Generando tu obra maestra...');
-                const imageUrl = await generateImage(finalPrompt, aspectRatio);
-                setResultData(imageUrl);
-            } else {
-                setLoadingMessage('Generando tu video... Esto puede tardar unos minutos. Por favor, espera.');
-                const videoUrl = await generateVideo(finalPrompt, aspectRatio);
-                setResultData(videoUrl);
-            }
+            setLoadingMessage('Generando tu obra maestra...');
+            const imageUrl = await generateImage(finalPrompt, aspectRatio);
+            setResultData(imageUrl);
             setStep('RESULT');
         } catch (err: any) {
             console.error(err);
             const errorMessage = err.message || 'Ocurrió un error inesperado durante la generación.';
             setError(`La generación de contenido falló. ${errorMessage}`);
-            if (errorMessage.includes("Requested entity was not found")) {
-                setError("Error de Clave API. Por favor, vuelve a seleccionar tu Clave API e intenta de nuevo.");
-                setIsApiKeySelected(false);
-            }
             setStep('PROMPT');
         } finally {
             setIsLoading(false);
@@ -411,7 +352,6 @@ const App: React.FC = () => {
         setFinalPrompt('');
         setError(null);
         setResultData(null);
-        setGenerationType('IMAGE');
         setAspectRatio('1:1');
     };
     
@@ -455,19 +395,14 @@ const App: React.FC = () => {
             case 'PROMPT': 
                 return <FinalPrompt 
                     finalPrompt={finalPrompt}
-                    generationType={generationType}
-                    onGenerationTypeChange={setGenerationType}
                     aspectRatio={aspectRatio}
                     onAspectRatioChange={setAspectRatio}
                     onGenerate={handleGenerateContent}
                     isLoading={isLoading}
-                    isApiKeySelected={isApiKeySelected}
-                    onKeySelected={() => setIsApiKeySelected(true)}
                 />;
             case 'RESULT': 
                 return <GenerationResult 
                     resultData={resultData}
-                    generationType={generationType}
                     onStartOver={handleStartOver}
                 />;
             default: 
