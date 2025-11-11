@@ -16,6 +16,37 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+const getFriendlyErrorMessage = (error: any): string => {
+    if (!error) {
+        return 'Ocurrió un error inesperado.';
+    }
+
+    let message = error.message || 'Ocurrió un error inesperado.';
+
+    // The Gemini SDK might throw errors where the message is a JSON string.
+    try {
+        // A simple check to see if it looks like a JSON object string
+        if (message.startsWith('{') && message.endsWith('}')) {
+            const parsedError = JSON.parse(message);
+            const apiError = parsedError.error || parsedError;
+
+            if (apiError && apiError.message) {
+                // Check for specific error codes or messages for friendlier text
+                if (apiError.code === 503 || apiError.message.toLowerCase().includes('overloaded')) {
+                    return 'El modelo de IA está sobrecargado. Por favor, inténtalo de nuevo en unos momentos.';
+                }
+                // Return the specific message from the API
+                return apiError.message;
+            }
+        }
+    } catch (e) {
+        // Not a JSON string, so we just return the original message
+    }
+
+    // Fallback for non-JSON messages
+    return message;
+};
+
 
 // --- Step Components ---
 
@@ -277,9 +308,8 @@ const App: React.FC = () => {
             setQuestions(generatedQuestions);
         } catch (err: any) {
             console.error(err);
-            // The service layer now handles retries. This error is shown after multiple failed attempts.
-            const errorMessage = err.message || 'Ocurrió un error inesperado.';
-            setError(`Error al generar las preguntas. ${errorMessage} Por favor, intenta de nuevo o modifica tu idea inicial.`);
+            const friendlyMessage = getFriendlyErrorMessage(err);
+            setError(`Error al generar las preguntas. ${friendlyMessage} Por favor, intenta de nuevo o modifica tu idea inicial.`);
             setStep('IDEA');
         } finally {
             setIsLoading(false);
@@ -297,8 +327,8 @@ const App: React.FC = () => {
             setFinalPrompt(synthesizedPrompt);
         } catch (err: any) {
             console.error(err);
-            const errorMessage = err.message || 'Ocurrió un error inesperado.';
-            setError(`Error al crear el prompt final. ${errorMessage} Por favor, intenta de nuevo.`);
+            const friendlyMessage = getFriendlyErrorMessage(err);
+            setError(`Error al crear el prompt final. ${friendlyMessage} Por favor, intenta de nuevo.`);
             setStep('QUESTIONS');
         } finally {
             setIsLoading(false);
@@ -318,8 +348,8 @@ const App: React.FC = () => {
             setStep('RESULT');
         } catch (err: any) {
             console.error(err);
-            const errorMessage = err.message || 'Ocurrió un error inesperado durante la generación.';
-            setError(`La generación de contenido falló después de varios intentos. ${errorMessage}`);
+            const friendlyMessage = getFriendlyErrorMessage(err);
+            setError(`La generación de contenido falló. ${friendlyMessage}`);
             setStep('PROMPT');
         } finally {
             setIsLoading(false);

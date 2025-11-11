@@ -136,7 +136,9 @@ Idea Inicial: "${idea}"
 Preguntas y Respuestas de Refinamiento:
 ${answersString}${additionalIdeaText}
 
-Si hay imágenes de referencia, describe sus elementos clave, estilo y composición e incorpóralos al prompt. Combina toda esta información en un solo párrafo. El prompt debe ser descriptivo, evocador y proporcionar instrucciones claras para la IA. No hagas más preguntas. Solo proporciona el texto del prompt final.`;
+Si hay imágenes de referencia, describe sus elementos clave, estilo y composición e incorpóralos al prompt. Combina toda esta información en un solo párrafo. El prompt debe ser descriptivo, evocador y proporcionar instrucciones claras para la IA. No hagas más preguntas. Solo proporciona el texto del prompt final.
+
+IMPORTANTE: El prompt final DEBE ESTAR ESCRITO EN INGLÉS.`;
 
         const textPart: Part = { text: promptText };
         const parts: Part[] = [textPart];
