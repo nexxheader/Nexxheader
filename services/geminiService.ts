@@ -1,5 +1,5 @@
 // FIX: Removed import of deprecated 'GenerateContentRequest' as it is no longer exported from "@google/genai".
-import { GoogleGenAI, Type, Part } from "@google/genai";
+import { GoogleGenAI, Type, Part, GenerateContentResponse } from "@google/genai";
 import type { Question, AspectRatio } from '../types';
 
 async function getGenAIClient() {
@@ -12,6 +12,36 @@ async function getGenAIClient() {
     return new GoogleGenAI({ apiKey: process.env.API_KEY });
 }
 
+// Helper for retrying API calls with exponential backoff
+const callGeminiWithRetries = async (
+    params: {
+        model: string;
+        contents: { parts: Part[] };
+        config?: any;
+    },
+    maxRetries = 3
+): Promise<GenerateContentResponse> => {
+    const ai = await getGenAIClient();
+    let lastError: any = new Error("La llamada a la API falló después de múltiples reintentos.");
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const response = await ai.models.generateContent(params);
+            return response; // Success
+        } catch (error) {
+            lastError = error;
+            console.error(`Intento de llamada a la API ${attempt + 1} fallido:`, error);
+            if (attempt < maxRetries - 1) {
+                const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s...
+                console.log(`Reintentando en ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    throw lastError;
+};
+
+
 // Helper to extract base64 data and mime type from a data URL
 const parseDataUrl = (dataUrl: string): { mimeType: string; data: string } => {
     const parts = dataUrl.split(',');
@@ -22,8 +52,6 @@ const parseDataUrl = (dataUrl: string): { mimeType: string; data: string } => {
 
 
 export async function generateQuestions(idea: string, referenceImages: string[]): Promise<Question[]> {
-    const ai = await getGenAIClient();
-    
     const textPart: Part = { text: `Basado en la idea simple del usuario "${idea}" y las imágenes de referencia adjuntas (si las hay), genera un máximo de 3 preguntas para construir un prompt detallado para un generador de IA. Para cada pregunta, proporciona también un array de 4 a 6 opciones de respuesta concisas y variadas que el usuario pueda seleccionar.
 
 La estructura de las preguntas debe ser:
@@ -44,7 +72,7 @@ Devuelve las preguntas como un array JSON de objetos, donde cada objeto tiene un
         parts.unshift(...imageParts);
     }
 
-    const response = await ai.models.generateContent({
+    const response = await callGeminiWithRetries({
         model: "gemini-2.5-pro",
         contents: { parts },
         config: {
@@ -86,7 +114,6 @@ Devuelve las preguntas como un array JSON de objetos, donde cada objeto tiene un
 
 
 export async function synthesizePrompt(idea: string, questions: Question[], answers: Record<string, string[]>, referenceImages: string[], additionalIdea: string): Promise<string> {
-    const ai = await getGenAIClient();
     const answersString = questions
         .map(q => {
             const answerList = answers[q.id];
@@ -126,7 +153,7 @@ Si hay imágenes de referencia, describe sus elementos clave, estilo y composici
         parts.unshift(...imageParts);
     }
 
-    const response = await ai.models.generateContent({
+    const response = await callGeminiWithRetries({
         model: "gemini-2.5-pro",
         contents: { parts },
         config: {

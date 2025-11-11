@@ -275,9 +275,10 @@ const App: React.FC = () => {
         try {
             const generatedQuestions = await generateQuestions(initialIdea, referenceImages);
             setQuestions(generatedQuestions);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError('Error al generar las preguntas. Por favor, intenta de nuevo.');
+            const errorMessage = err.message || 'Ocurrió un error inesperado.';
+            setError(`Error al generar las preguntas: ${errorMessage}. Por favor, intenta de nuevo.`);
             setStep('IDEA');
         } finally {
             setIsLoading(false);
@@ -293,9 +294,10 @@ const App: React.FC = () => {
         try {
             const synthesizedPrompt = await synthesizePrompt(initialIdea, questions, answers, referenceImages, additionalIdea);
             setFinalPrompt(synthesizedPrompt);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError('Error al crear el prompt final. Por favor, intenta de nuevo.');
+            const errorMessage = err.message || 'Ocurrió un error inesperado.';
+            setError(`Error al crear el prompt final: ${errorMessage}. Por favor, intenta de nuevo.`);
             setStep('QUESTIONS');
         } finally {
             setIsLoading(false);
