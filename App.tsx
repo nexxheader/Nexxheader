@@ -277,8 +277,9 @@ const App: React.FC = () => {
             setQuestions(generatedQuestions);
         } catch (err: any) {
             console.error(err);
+            // The service layer now handles retries. This error is shown after multiple failed attempts.
             const errorMessage = err.message || 'Ocurrió un error inesperado.';
-            setError(`Error al generar las preguntas: ${errorMessage}. Por favor, intenta de nuevo.`);
+            setError(`Error al generar las preguntas. ${errorMessage} Por favor, intenta de nuevo o modifica tu idea inicial.`);
             setStep('IDEA');
         } finally {
             setIsLoading(false);
@@ -297,7 +298,7 @@ const App: React.FC = () => {
         } catch (err: any) {
             console.error(err);
             const errorMessage = err.message || 'Ocurrió un error inesperado.';
-            setError(`Error al crear el prompt final: ${errorMessage}. Por favor, intenta de nuevo.`);
+            setError(`Error al crear el prompt final. ${errorMessage} Por favor, intenta de nuevo.`);
             setStep('QUESTIONS');
         } finally {
             setIsLoading(false);
@@ -318,7 +319,7 @@ const App: React.FC = () => {
         } catch (err: any) {
             console.error(err);
             const errorMessage = err.message || 'Ocurrió un error inesperado durante la generación.';
-            setError(`La generación de contenido falló. ${errorMessage}`);
+            setError(`La generación de contenido falló después de varios intentos. ${errorMessage}`);
             setStep('PROMPT');
         } finally {
             setIsLoading(false);
